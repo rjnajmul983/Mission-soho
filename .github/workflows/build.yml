@@ -1,0 +1,55 @@
+name: Build Mission Soho APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract MissionSoho.zip
+        run: |
+          if [ ! -f "MissionSoho.zip" ]; then
+            echo "ERROR: MissionSoho.zip not found in repository root!"
+            exit 1
+          fi
+          unzip -o MissionSoho.zip -x ".github/*"
+          ls -la
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Download Three.js r128
+        run: |
+          mkdir -p app/src/main/assets/js
+          TARGET="app/src/main/assets/js/three.min.js"
+          curl -fSL --retry 3 "https://unpkg.com/three@0.128.0/build/three.min.js" -o "$TARGET" || \
+          curl -fSL --retry 3 "https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js" -o "$TARGET"
+          if [ ! -s "$TARGET" ]; then
+            echo "ERROR: three.min.js download failed or is empty!"
+            exit 1
+          fi
+
+      - name: Set up Gradle 8.7
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Build Debug APK
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload MissionSoho APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: MissionSoho-APK
+          path: app/build/outputs/apk/debug/*.apk
